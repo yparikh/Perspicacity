@@ -1,7 +1,7 @@
 import react, { useState } from "react";
 import axios from "axios";
 import Papa from "papaparse";
-
+import { z } from "zod";
 
 import UploadDialog from "./UploadDialog";
 import DataTable from "./DataTable";
@@ -13,6 +13,16 @@ function UploadForm() {
   const [headers, setHeaders] = useState<boolean>(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const RowSchema = z.object({
+    dates: z.coerce.date(),
+    category: z.string(),
+    amount: z.coerce.number(),
+    description: z.string(),
+  });
+
+  type Row = z.infer<typeof RowSchema>;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -30,16 +40,43 @@ function UploadForm() {
     if (!file) {
       return;
     }
+
     console.log("Submitting with file:", file?.name);
     setLoading(true);
     Papa.parse(file, {
-      complete: async (result: Papa.ParseResults<any>) => {
+      complete: async (result: Papa.ParseResult<any>) => {
         console.log("Parsed data:", result.data);
         setPreviewData(result.data);
 
         try {
+          const validRows: Row[] = [];
+          const invalidRows: any[] = [];
+
+          for (const row of result.data) {
+            const parsed = RowSchema.safeParse(row);
+            if (parsed.success) {
+              validRows.push(parsed.data);
+            } else {
+              invalidRows.push({
+                row,
+                error: z.treeifyError(parsed.error),
+              });
+            }
+          }
+
+          if (invalidRows.length > 0) {
+            console.warn("Invalid rows detected:", invalidRows);
+          }
+
+          const csvString = Papa.unparse(validRows);
+
+          const blob = new Blob([csvString], { type: "text/csv" });
+          const cleanFile = new File([blob], "validated.csv", {
+            type: "text/csv",
+          });
+
           const formData = new FormData();
-          formData.append("csv", file);
+          formData.append("csv", cleanFile);
           const config = { headers: { "Content-Type": "multipart/form-data" } };
           const data = await axios.post(
             "http://localhost:5000/upload/",
@@ -50,6 +87,7 @@ function UploadForm() {
           console.log(data);
         } catch (err) {
           console.log(err);
+          setError("Upload failed. Please try again.");
         } finally {
           setLoading(false);
         }
@@ -63,10 +101,10 @@ function UploadForm() {
 
   return (
     <>
-    <Button
+      <Button
         type="button"
         variant="outline"
-        onClick={() => (setDialogOpen(true))}
+        onClick={() => setDialogOpen(true)}
       >
         Upload CSV
       </Button>
@@ -77,7 +115,8 @@ function UploadForm() {
         onHeaderChange={setHeaders}
         onSubmit={handleSubmit}
         loading={loading}
-        />
+        file={file}
+      />
 
       <DataTable previewData={previewData} headers={headers} />
     </>

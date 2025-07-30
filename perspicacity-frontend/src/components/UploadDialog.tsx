@@ -1,4 +1,3 @@
-import react, { useState } from "react";
 import {
   Dialog,
   DialogClose,
@@ -6,7 +5,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +18,7 @@ type UploadDialogProps = {
   onFileSelect: React.ChangeEventHandler<HTMLInputElement>;
   onHeaderChange: (checked: boolean) => void;
   loading: boolean;
+  file?: File;
 };
 
 export default function UploadDialog({
@@ -29,6 +28,7 @@ export default function UploadDialog({
   onFileSelect,
   onHeaderChange,
   loading,
+  file,
 }: UploadDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,7 +62,7 @@ export default function UploadDialog({
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || !file}>
               {loading ? "Uploading..." : "Submit"}
             </Button>
           </DialogFooter>
