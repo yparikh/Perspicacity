@@ -14,9 +14,9 @@ import { Label } from "@/components/ui/label";
 type UploadDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: React.FormEventHandler<HTMLFormElement>;
-  onFileSelect: React.ChangeEventHandler<HTMLInputElement>;
+  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onHeaderChange: (checked: boolean) => void;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   loading: boolean;
   file?: File;
 };
@@ -39,7 +39,7 @@ export default function UploadDialog({
             <DialogTitle>Upload your CSV</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4">
-            <div className="grid gap-3">
+            <div className="grid gap-3 m-2">
               <Label htmlFor="csv">CSV Upload</Label>
               <Input
                 id="csv"

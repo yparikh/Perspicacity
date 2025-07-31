@@ -6,6 +6,14 @@ import { z } from "zod";
 import UploadDialog from "./UploadDialog";
 import DataTable from "./DataTable";
 import { Button } from "./ui/button";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 function UploadForm() {
   const [file, setFile] = useState<File | undefined>(undefined);
@@ -66,6 +74,7 @@ function UploadForm() {
 
           if (invalidRows.length > 0) {
             console.warn("Invalid rows detected:", invalidRows);
+            toast.warning("Invalid Rows Found");
           }
 
           const csvString = Papa.unparse(validRows);
@@ -85,6 +94,7 @@ function UploadForm() {
           );
           setDialogOpen(false);
           console.log(data);
+          toast.success("Upload Successful");
         } catch (err) {
           console.log(err);
           setError("Upload failed. Please try again.");
@@ -101,13 +111,20 @@ function UploadForm() {
 
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => setDialogOpen(true)}
-      >
-        Upload CSV
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDialogOpen(true)}
+          >
+            Upload CSV
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Valid Columns: Date, Category, Amount, Description</p>
+        </TooltipContent>
+      </Tooltip>
       <UploadDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
@@ -117,7 +134,7 @@ function UploadForm() {
         loading={loading}
         file={file}
       />
-
+      <Toaster />
       <DataTable previewData={previewData} headers={headers} />
     </>
   );
