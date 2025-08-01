@@ -32,7 +32,6 @@ export default function UploadDialog({
 }: UploadDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      
       <DialogContent className="sm:max-w-[550px]">
         <form onSubmit={onSubmit} encType={"multipart/form-data"}>
           <DialogHeader>

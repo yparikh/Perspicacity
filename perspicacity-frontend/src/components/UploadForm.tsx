@@ -17,7 +17,9 @@ import {
 
 function UploadForm() {
   const [file, setFile] = useState<File | undefined>(undefined);
-  const [previewData, setPreviewData] = useState<any[][]>([]);
+  const [previewData, setPreviewData] = useState<Record<string, string>[] | []>(
+    []
+  );
   const [headers, setHeaders] = useState<boolean>(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -43,68 +45,90 @@ function UploadForm() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("handleSubmit triggered");
-    console.log("file state at submit:", file);
+
     if (!file) {
       return;
     }
 
-    console.log("Submitting with file:", file?.name);
     setLoading(true);
-    Papa.parse(file, {
-      complete: async (result: Papa.ParseResult<any>) => {
-        console.log("Parsed data:", result.data);
-        setPreviewData(result.data);
 
-        try {
-          const validRows: Row[] = [];
-          const invalidRows: any[] = [];
-
-          for (const row of result.data) {
-            const parsed = RowSchema.safeParse(row);
-            if (parsed.success) {
-              validRows.push(parsed.data);
-            } else {
-              invalidRows.push({
-                row,
-                error: z.treeifyError(parsed.error),
-              });
-            }
-          }
-
-          if (invalidRows.length > 0) {
-            console.warn("Invalid rows detected:", invalidRows);
-            toast.warning("Invalid Rows Found");
-          }
-
-          const csvString = Papa.unparse(validRows);
-
-          const blob = new Blob([csvString], { type: "text/csv" });
-          const cleanFile = new File([blob], "validated.csv", {
-            type: "text/csv",
-          });
-
-          const formData = new FormData();
-          formData.append("csv", cleanFile);
-          const config = { headers: { "Content-Type": "multipart/form-data" } };
-          const data = await axios.post(
-            "http://localhost:5000/upload/",
-            formData,
-            config
-          );
-          setDialogOpen(false);
-          console.log(data);
-          toast.success("Upload Successful");
-        } catch (err) {
-          console.log(err);
-          setError("Upload failed. Please try again.");
-        } finally {
-          setLoading(false);
-        }
-      },
+    const text = await file.text();
+    console.log("CSV file content:\n", text);
+    const result = Papa.parse(text, {
       skipEmptyLines: true,
       header: headers,
     });
+
+    console.log("Raw parsed result from Papa:", result.data);
+
+    try {
+      const validRows: Row[] = [];
+      const invalidRows: any[] = [];
+
+      for (const row of result.data) {
+        const parsed = RowSchema.safeParse(row);
+        console.log("Row before parsing:", row);
+        if (parsed.success) {
+          validRows.push(parsed.data);
+        } else {
+          console.warn("Failed row:", z.treeifyError(parsed.error));
+          invalidRows.push({
+            row,
+            error: z.treeifyError(parsed.error),
+          });
+        }
+      }
+
+      if (invalidRows.length > 0) {
+        console.warn("Invalid rows detected:", invalidRows);
+        invalidRows.map(({ row, error }, i) =>
+          toast.warning(
+            <div key={i}>
+              <p>
+                Row {i + 1}: {JSON.stringify(row)}
+              </p>
+              <p>{JSON.stringify(error, null, 2)}</p>
+            </div>
+          )
+        );
+      }
+      
+      const csvString = Papa.unparse(validRows);
+      const blob = new Blob([csvString], { type: "text/csv" });
+      const cleanFile = new File([blob], file.name, {
+        type: "text/csv",
+      });
+
+      const formData = new FormData();
+      formData.append("csv", cleanFile);
+      const config = { headers: { "Content-Type": "multipart/form-data" } };
+
+      console.log("Valid rows for backend:", validRows);
+      console.log("CSV string being sent:", csvString);
+
+      const data = await axios.post(
+        "http://localhost:5000/upload/",
+        formData,
+        config
+      );
+      setDialogOpen(false);
+      setPreviewData(
+        validRows.map((row) => ({
+          dates: row.dates.toISOString().split("T")[0],
+          category: row.category,
+          amount: row.amount.toString(),
+          description: row.description,
+        }))
+      );
+      console.log(data);
+      toast.success("Upload Successful");
+    } catch (err) {
+      console.log(err);
+      setError("Upload failed. Please try again.");
+      toast.warning("Upload Failed. Please try again");
+    } finally {
+      setLoading(false);
+    }
   };
 
   console.log("Preview data state:", previewData);
@@ -134,7 +158,7 @@ function UploadForm() {
         loading={loading}
         file={file}
       />
-      <Toaster />
+      <Toaster richColors />
       <DataTable previewData={previewData} headers={headers} />
     </>
   );

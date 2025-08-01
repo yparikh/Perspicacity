@@ -14,8 +14,24 @@ app.use(express.json());
 
 //File Upload Config
 const allowedMimeTypes = ['text/csv', 'application/vnd.ms-excel'];
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // The folder where files will be stored
+  },
+  filename: function (req, file, cb) {
+    // Use the original filename
+    cb(null, file.originalname); 
+  }
+});
+
+
 const upload = multer({
-  dest: "uploads/",
+  storage: storage,
+  filename: function (req, file, cb) {
+    // Use the original filename and extension
+    cb(null, file.originalname); 
+  },
   limits:{fileSize:'1000000'},
   fileFilter: (req, file, callback) => {
     const isMimeType = allowedMimeTypes.includes(file.mimetype);
