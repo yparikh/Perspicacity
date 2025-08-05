@@ -30,7 +30,7 @@ const upload = multer({
   storage: storage,
   filename: function (req, file, cb) {
     // Use the original filename and extension
-    cb(null, file.originalname); 
+    cb(null, (file.originalname).trim().toLowerCase()); 
   },
   limits:{fileSize:'1000000'},
   fileFilter: (req, file, callback) => {
