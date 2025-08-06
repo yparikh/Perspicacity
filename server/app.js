@@ -12,6 +12,14 @@ let corsOptions = {
 app.use(cors());
 app.use(express.json());
 
+function checkDuplicates(req, res, next) {
+      if(true) {
+        return res.status(409).json({error: "file already exists."})
+      }
+
+      return next();
+  }
+
 //File Upload Config
 const allowedMimeTypes = ['text/csv', 'application/vnd.ms-excel'];
 
@@ -25,13 +33,8 @@ const storage = multer.diskStorage({
   }
 });
 
-
 const upload = multer({
   storage: storage,
-  filename: function (req, file, cb) {
-    // Use the original filename and extension
-    cb(null, (file.originalname).trim().toLowerCase()); 
-  },
   limits:{fileSize:'1000000'},
   fileFilter: (req, file, callback) => {
     const isMimeType = allowedMimeTypes.includes(file.mimetype);
@@ -51,6 +54,10 @@ app.get('/', (req, res) => {
 });
 
 app.post("/upload", (req, res) => {
+
+  checkDuplicates(); 
+  
+
   upload.single("csv")(req, res, function (err) {
     if (err) {
       console.error("Multer error:", err.message);  // log for debug
