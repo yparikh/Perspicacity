@@ -1,7 +1,6 @@
 import react, { useState } from "react";
 import axios from "axios";
 import Papa from "papaparse";
-import { z } from "zod";
 
 import UploadDialog from "./UploadDialog";
 import DataTable from "./DataTable";
@@ -14,6 +13,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  parseCSV,
+  uploadValidRows,
+  validateParsedRows,
+} from "@/utils/uploadUtils";
+import {
+  showInvalidRowsToast,
+  showUploadErrorToast,
+  showUploadSuccessToast,
+} from "@/utils/toasts";
 
 function UploadForm() {
   const [file, setFile] = useState<File | undefined>(undefined);
@@ -24,15 +33,6 @@ function UploadForm() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const RowSchema = z.object({
-    dates: z.coerce.date(),
-    category: z.string(),
-    amount: z.coerce.number(),
-    description: z.string(),
-  });
-
-  type Row = z.infer<typeof RowSchema>;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -52,65 +52,14 @@ function UploadForm() {
 
     setLoading(true);
 
-    const text = await file.text();
-    console.log("CSV file content:\n", text);
-    const result = Papa.parse(text, {
-      skipEmptyLines: true,
-      header: headers,
-    });
-
-    console.log("Raw parsed result from Papa:", result.data);
-
     try {
-      const validRows: Row[] = [];
-      const invalidRows: any[] = [];
-
-      for (const row of result.data) {
-        const parsed = RowSchema.safeParse(row);
-        console.log("Row before parsing:", row);
-        if (parsed.success) {
-          validRows.push(parsed.data);
-        } else {
-          console.warn("Failed row:", z.treeifyError(parsed.error));
-          invalidRows.push({
-            row,
-            error: z.treeifyError(parsed.error),
-          });
-        }
-      }
-
+      const result = await parseCSV(file, headers);
+      const { validRows, invalidRows } = validateParsedRows(result.data);
       if (invalidRows.length > 0) {
-        console.warn("Invalid rows detected:", invalidRows);
-        invalidRows.map(({ row, error }, i) =>
-          toast.warning(
-            <div key={i}>
-              <p>
-                Row {i + 1}: {JSON.stringify(row)}
-              </p>
-              <p>{JSON.stringify(error, null, 2)}</p>
-            </div>
-          )
-        );
+        showInvalidRowsToast(invalidRows);
       }
-      
-      const csvString = Papa.unparse(validRows);
-      const blob = new Blob([csvString], { type: "text/csv" });
-      const cleanFile = new File([blob], file.name, {
-        type: "text/csv",
-      });
+      const data = await uploadValidRows(validRows, file.name);
 
-      const formData = new FormData();
-      formData.append("csv", cleanFile);
-      const config = { headers: { "Content-Type": "multipart/form-data" } };
-
-      console.log("Valid rows for backend:", validRows);
-      console.log("CSV string being sent:", csvString);
-
-      const data = await axios.post(
-        "http://localhost:5000/upload/",
-        formData,
-        config
-      );
       setDialogOpen(false);
       setPreviewData(
         validRows.map((row) => ({
@@ -121,17 +70,20 @@ function UploadForm() {
         }))
       );
       console.log(data);
-      toast.success("Upload Successful");
+      showUploadSuccessToast();
     } catch (err) {
-      console.log(err);
-      setError("Upload failed. Please try again.");
-      toast.warning("Upload Failed. Please try again");
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        showUploadErrorToast(
+          "Duplicate File Detected. Try again with a new file or change name."
+        );
+      } else {
+        console.log(err);
+        showUploadErrorToast("Upload Failed. Please try again");
+      }
     } finally {
       setLoading(false);
     }
   };
-
-  console.log("Preview data state:", previewData);
 
   return (
     <>
